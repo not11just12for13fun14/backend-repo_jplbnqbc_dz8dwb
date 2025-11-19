@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -47,14 +47,10 @@ def test_database():
         resp["error"] = str(e)
     return resp
 
-# Seed minimal demo products if none exist (for preview)
-@app.post("/seed")
-def seed_products():
-    if db is None:
-        raise HTTPException(500, "Database not configured")
-    if db.product.count_documents({}) > 0:
-        return {"seeded": False, "count": db.product.count_documents({})}
-    demo = [
+# Demo products factory
+
+def demo_products() -> List[dict]:
+    base: List[Product] = [
         Product(
             title="Midnight Iris",
             slug="midnight-iris",
@@ -68,7 +64,7 @@ def seed_products():
             colors=["black","white"],
             sizes=["S","M","L","XL"],
             featured=True,
-        ).model_dump(),
+        ),
         Product(
             title="Void Seraph",
             slug="void-seraph",
@@ -82,9 +78,110 @@ def seed_products():
             colors=["black"],
             sizes=["S","M","L","XL"],
             featured=True,
-        ).model_dump(),
+        ),
+        Product(
+            title="Neon Oracle",
+            slug="neon-oracle",
+            description="Cropped hoodie with phosphor oracle sigil.",
+            price=149.0,
+            categories=["hoodies"],
+            collections=["drop-001"],
+            rarity="limited",
+            total_edition=120,
+            images=["/products/neon-oracle-1.jpg"],
+            colors=["black","slate"],
+            sizes=["S","M","L","XL"],
+            featured=False,
+        ),
+        Product(
+            title="Spectral Lace",
+            slug="spectral-lace",
+            description="Long sleeve with iridescent spectral filament print.",
+            price=129.0,
+            categories=["tops"],
+            collections=["drop-001"],
+            rarity="limited",
+            total_edition=160,
+            images=["/products/spectral-lace-1.jpg"],
+            colors=["charcoal","white"],
+            sizes=["S","M","L","XL"],
+        ),
+        Product(
+            title="Chrome Nocturne",
+            slug="chrome-nocturne",
+            description="Tech pants with liquid chrome seam piping.",
+            price=189.0,
+            categories=["pants"],
+            collections=["drop-001"],
+            rarity="ultra",
+            total_edition=77,
+            images=["/products/chrome-nocturne-1.jpg"],
+            colors=["black"],
+            sizes=["S","M","L","XL"],
+        ),
+        Product(
+            title="Abyssal Bloom",
+            slug="abyssal-bloom",
+            description="Tee with deep-indigo floral glitch embroidery.",
+            price=95.0,
+            categories=["tees"],
+            collections=["drop-001"],
+            rarity="limited",
+            total_edition=144,
+            images=["/products/abyssal-bloom-1.jpg"],
+            colors=["black","navy"],
+            sizes=["S","M","L","XL"],
+        ),
+        Product(
+            title="Prism Wraith",
+            slug="prism-wraith",
+            description="Windbreaker with refracted prism overlay.",
+            price=199.0,
+            categories=["outerwear"],
+            collections=["drop-001"],
+            rarity="grail",
+            total_edition=33,
+            images=["/products/prism-wraith-1.jpg"],
+            colors=["black"],
+            sizes=["S","M","L","XL"],
+        ),
+        Product(
+            title="Iris Eclipse Beanie",
+            slug="iris-eclipse-beanie",
+            description="Beanie with micro-glow eclipse patch.",
+            price=49.0,
+            categories=["accessories"],
+            collections=["drop-001"],
+            rarity="common",
+            total_edition=400,
+            images=["/products/iris-eclipse-1.jpg"],
+            colors=["black","purple"],
+            sizes=[],
+        ),
     ]
-    for d in demo:
+    return [p.model_dump() for p in base]
+
+# Auto-seed on startup if empty
+@app.on_event("startup")
+def auto_seed():
+    try:
+        if db is None:
+            return
+        if db.product.count_documents({}) == 0:
+            for d in demo_products():
+                create_document("product", d)
+    except Exception:
+        # fail silently so server still boots
+        pass
+
+# Seed minimal demo products if none exist (for preview)
+@app.post("/seed")
+def seed_products():
+    if db is None:
+        raise HTTPException(500, "Database not configured")
+    if db.product.count_documents({}) > 0:
+        return {"seeded": False, "count": db.product.count_documents({})}
+    for d in demo_products():
         create_document("product", d)
     return {"seeded": True, "count": db.product.count_documents({})}
 
